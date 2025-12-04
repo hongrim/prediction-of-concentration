@@ -1,0 +1,25 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
+data = pd.read_csv
+x = data['Concentration'].values
+y_Z = data['θ(f=100)'].values
+
+mask = y_Z != 0
+x = x[mask]
+y_Z = y_Z[mask]
+
+loess_frac = 0.1  
+y_loess = lowess(y_Z, x, frac=loess_frac, return_sorted=False)
+
+mean_original, std_original = np.mean(y_Z), np.std(y_Z)
+mean_loess, std_loess = np.mean(y_loess), np.std(y_loess)
+normalized_original = (y_Z - mean_original) / std_original  
+normalized_loess = (y_loess - mean_loess) / std_loess  
+
+x_interp = np.linspace(np.min(x), np.max(x), 1000)
+
+y_interp = np.interp(x_interp, x, y_loess)
