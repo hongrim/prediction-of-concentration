@@ -1,0 +1,74 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.interpolate import CubicSpline, UnivariateSpline
+from scipy.signal import savgol_filter
+from matplotlib.colors import LinearSegmentedColormap
+
+data = pd.read_csv
+x = data['Concentration'].values
+y_100 = data['Z(f=100)'].values
+y_1000 = data['Z(f=1000)'].values
+y_re = data['Z(f=10000)'].values
+y_contact = data['Z contact'].values
+
+mask = (y_100 != 0) & (y_1000 != 0) & (y_re != 0) & (y_contact != 0) & \
+       (~np.isnan(y_100)) & (~np.isnan(y_1000)) & (~np.isnan(y_re)) & (~np.isnan(y_contact))
+x = x[mask]
+y_100 = y_100[mask]
+y_1000 = y_1000[mask]
+y_re = y_re[mask]
+y_contact = y_contact[mask]
+
+def group_mean(x, y):
+    x_unique = np.unique(x)
+    mean_y = np.array([np.mean(y[x == xi]) for xi in x_unique])
+    return x_unique, mean_y
+
+x_g, y_100_g = group_mean(x, y_100)
+_, y_1000_g = group_mean(x, y_1000)
+_, y_re_g = group_mean(x, y_re)
+
+x_interp = np.linspace(min(x_g), max(x_g), 1000)
+cs_100 = CubicSpline(x_g, y_100_g)(x_interp)
+cs_1000 = CubicSpline(x_g, y_1000_g)(x_interp)
+cs_re = CubicSpline(x_g, y_re_g)(x_interp)
+
+results = []
+for polyorder in [2, 3]:
+    for factor in range(8, 20):
+        window_length = max(polyorder + 2, len(y_contact) // factor)
+        if window_length % 2 == 0:
+            window_length += 1
+        if window_length >= len(y_contact):
+            continue
+        try:
+            y_sg = savgol_filter(y_contact, window_length, polyorder)
+            rel_error = np.mean(np.abs((y_contact - y_sg) / np.where(y_contact == 0, 1e-8, y_contact)))
+            results.append({
+                'Method': 'Savitzky-Golay',
+                'Polyorder': polyorder,
+                'Window': window_length,
+                'Mean Relative Error': rel_error,
+                'Smoothed': y_sg
+            })
+        except:
+            continue
+
+for s in [10, 50, 100, 300, 500, 1000]:
+    try:
+        spline = UnivariateSpline(x, y_contact, s=s)
+        y_spline = spline(x)
+        rel_error = np.mean(np.abs((y_contact - y_spline) / np.where(y_contact == 0, 1e-8, y_contact)))
+        results.append({
+            'Method': 'UnivariateSpline',
+            'S': s,
+            'Mean Relative Error': rel_error,
+            'Smoothed': y_spline
+        })
+    except:
+        continue
+
+best = min(results, key=lambda r: r['Mean Relative Error'])
+y_contact_smooth = best['Smoothed']
