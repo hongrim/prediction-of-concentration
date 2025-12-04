@@ -1,0 +1,39 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import matplotlib.pyplot as plt
+import numpy as np
+from xgboost import XGBRegressor
+
+# 加载数据
+file_path = r'inter234.xlsx'
+data = pd.read_excel(file_path)
+
+# 分割特征和目标变量
+X = data[['Z100','Z1000', 'Z10000', 'θ100', 'θ10000', 'R', 'Z contact','I','method']]
+X = pd.get_dummies(X, columns=['method'])  
+y = data['Concentration']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+X_s = scaler.transform(X)
+
+svr_model = SVR(
+    kernel='rbf',       
+    C=100,             
+    gamma='scale',      
+    epsilon=0.1          
+)
+svr_model.fit(X_train, y_train)
+
+y_train_pred = svr_model.predict(X_train)
+y_test_pred = svr_model.predict(X_test)
+y_pred = svr_model.predict(X_s)
+
+print("Test R2:", r2_score(y_test, y_test_pred))
+print("Test RMSE:", np.sqrt(mean_squared_error(y_test, y_test_pred)))
+print("Test MAE:", mean_absolute_error(y_test, y_test_pred))
